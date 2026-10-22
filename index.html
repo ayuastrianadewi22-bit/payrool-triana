@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PT. TRIANA - Sistem Manajemen Penggajian & Slip Gaji Karyawan</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printableSlipArea, #printableSlipArea * {
+        visibility: visible;
+      }
+      #printableSlipArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 20px;
+        background: white !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col font-sans">
+
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-700 to-blue-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i class="fa-solid fa-building-user text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">PT. TRIANA</h1>
+          <p class="text-xs text-slate-500">Sistem Presensi Jam Kerja, Lembur & Penggajian</p>
+        </div>
+      </div>
+      
+      <!-- Right Header Actions -->
+      <div class="flex items-center space-x-3">
+        <div class="hidden sm:flex items-center text-xs font-semibold px-3 py-1.5 bg-blue-50 text-brand-700 rounded-full border border-blue-200">
+          <i class="fa-regular fa-calendar-check mr-1.5"></i>
+          Periode: <span id="currentPeriodBadge" class="ml-1">Oktober 2026 (5 Hari Kerja / 22 Hari)</span>
+        </div>
+        <button onclick="exportToCSV()" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm transition">
+          <i class="fa-solid fa-file-excel text-emerald-600 mr-1.5"></i>
+          Export CSV
+        </button>
+        <button onclick="openEmployeeModal()" class="inline-flex items-center px-3.5 py-1.5 text-xs font-semibold text-white bg-brand-600 rounded-lg hover:bg-brand-700 shadow shadow-brand-500/25 transition">
+          <i class="fa-solid fa-plus mr-1.5"></i>
+          Tambah Karyawan
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <!-- Tab Navigation (Payroll vs Absensi) -->
+    <div class="flex border-b border-slate-200 space-x-2">
+      <button id="tabBtnPayroll" onclick="switchTab('payroll')" class="px-5 py-3 text-xs font-bold border-b-2 border-brand-600 text-brand-600 flex items-center space-x-2 transition">
+        <i class="fa-solid fa-money-check-dollar"></i>
+        <span>Penggajian & Slip Gaji</span>
+      </button>
+      <button id="tabBtnAttendance" onclick="switchTab('attendance')" class="px-5 py-3 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 transition">
+        <i class="fa-solid fa-user-clock"></i>
+        <span>Absensi (Jam Masuk/Keluar) & Lembur</span>
+        <span class="bg-blue-100 text-brand-700 text-[10px] px-2 py-0.5 rounded-full font-bold ml-1">Live Sync</span>
+      </button>
+    </div>
+
+    <!-- Top Stats Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Total Pengeluaran Bruto -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Beban Bruto</p>
+          <h3 id="statTotalGross" class="text-xl font-extrabold text-slate-900 mt-1">Rp 0</h3>
+          <span class="text-[11px] text-emerald-600 font-medium inline-flex items-center mt-1">
+            <i class="fa-solid fa-arrow-trend-up mr-1"></i> Termasuk tunjangan & lembur
+          </span>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-blue-50 text-brand-600 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-money-bill-wave"></i>
+        </div>
+      </div>
+
+      <!-- Total Take Home Pay -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Kas Transfer Bersih</p>
+          <h3 id="statTotalNet" class="text-xl font-extrabold text-emerald-600 mt-1">Rp 0</h3>
+          <span class="text-[11px] text-slate-500 font-medium inline-flex items-center mt-1">
+            Take Home Pay seluruh karyawan
+          </span>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-hand-holding-dollar"></i>
+        </div>
+      </div>
+
+      <!-- Total Potongan BPJS & Pajak -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Potongan BPJS & Pajak</p>
+          <h3 id="statTotalDeduction" class="text-xl font-extrabold text-amber-600 mt-1">Rp 0</h3>
+          <span class="text-[11px] text-slate-500 font-medium inline-flex items-center mt-1">
+            PPh 21, BPJS Kes & BPJS TK
+          </span>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-receipt"></i>
+        </div>
+      </div>
+
+      <!-- Jumlah Karyawan -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Karyawan</p>
+          <h3 id="statTotalEmployees" class="text-xl font-extrabold text-slate-900 mt-1">0 Orang</h3>
+          <span id="statActiveRatio" class="text-[11px] text-slate-500 font-medium inline-flex items-center mt-1">
+            0 Tetap | 0 Kontrak
+          </span>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-users"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex flex-1 w-full sm:w-auto items-center space-x-2">
+        <div class="relative w-full sm:max-w-xs">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+          </div>
+          <input type="text" id="searchInput" oninput="handleSearchFilter()" placeholder="Cari nama, ID, atau jabatan..." class="block w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 focus:bg-white transition">
+        </div>
+
+        <select id="filterDepartment" onchange="handleSearchFilter()" class="text-xs py-2 px-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <option value="ALL">Semua Departemen</option>
+          <option value="Engineering">Engineering</option>
+          <option value="Product & Design">Product & Design</option>
+          <option value="Finance & Tax">Finance & Tax</option>
+          <option value="HR & Operations">HR & Operations</option>
+        </select>
+
+        <select id="filterStatus" onchange="handleSearchFilter()" class="text-xs py-2 px-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+          <option value="ALL">Semua Status</option>
+          <option value="Tetap">Karyawan Tetap</option>
+          <option value="Kontrak">Karyawan Kontrak</option>
+        </select>
+      </div>
+
+      <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+        <button onclick="resetDefaults()" title="Reset ke data default" class="px-3 py-2 text-xs text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-100 transition">
+          <i class="fa-solid fa-arrow-rotate-left mr-1"></i> Data Awal
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW 1: PAYROLL SUMMARY TABLE -->
+    <div id="payrollViewSection" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h2 class="font-bold text-slate-900 text-sm">Daftar Rekapitulasi Payroll (Terhubung Otomatis ke Presensi)</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Potongan mangkir, tunjangan transport hadir, dan lembur terintegrasi dengan absensi</p>
+        </div>
+        <span class="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg" id="recordCountBadge">0 Karyawan</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/80 text-slate-500 uppercase font-semibold text-[11px] border-b border-slate-200 tracking-wider">
+            <tr>
+              <th scope="col" class="py-3.5 px-4 text-center">ID</th>
+              <th scope="col" class="py-3.5 px-4">Karyawan & Posisi</th>
+              <th scope="col" class="py-3.5 px-4 text-center">Presensi (22 Hari)</th>
+              <th scope="col" class="py-3.5 px-4 text-right">Gaji Pokok</th>
+              <th scope="col" class="py-3.5 px-4 text-right">Tunjangan Hadir</th>
+              <th scope="col" class="py-3.5 px-4 text-center">Lembur</th>
+              <th scope="col" class="py-3.5 px-4 text-right">Upah Lembur</th>
+              <th scope="col" class="py-3.5 px-4 text-right">Potongan Mangkir</th>
+              <th scope="col" class="py-3.5 px-4 text-right">Total Potongan</th>
+              <th scope="col" class="py-3.5 px-4 text-right font-bold text-slate-900">Take Home Pay</th>
+              <th scope="col" class="py-3.5 px-4 text-center">Aksi / Slip</th>
+            </tr>
+          </thead>
+          <tbody id="payrollTableBody" class="divide-y divide-slate-100">
+            <!-- Data will be populated via JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden py-12 text-center">
+        <div class="w-16 h-16 mx-auto mb-3 text-slate-300">
+          <i class="fa-solid fa-folder-open text-5xl"></i>
+        </div>
+        <p class="text-sm font-semibold text-slate-600">Tidak ada data karyawan ditemukan</p>
+        <p class="text-xs text-slate-400 mt-1">Coba sesuaikan kata kunci pencarian atau filter departemen Anda.</p>
+      </div>
+    </div>
+
+    <!-- VIEW 2: ATTENDANCE & OVERTIME LOG TABLE (5 HARI KERJA) -->
+    <div id="attendanceViewSection" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h2 class="font-bold text-slate-900 text-sm">PT. TRIANA - Modul Presensi & Rekap Jam Kerja (Jadwal Normal: 08:00 - 17:00)</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Input jam masuk dan jam keluar harian/rata-rata. Selisih jam keluar lewat pukul 17:00 akan terakumulasi ke jam lembur secara otomatis.</p>
+        </div>
+        <div class="flex items-center space-x-2 text-xs">
+          <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg font-medium">
+            <i class="fa-solid fa-circle-check mr-1"></i> 5 Hari Kerja (22 Hari/Bulan)
+          </span>
+          <span class="px-2.5 py-1 bg-blue-50 text-brand-700 border border-blue-200 rounded-lg font-medium">
+            <i class="fa-regular fa-clock mr-1"></i> Masuk: 08:00 | Pulang: 17:00
+          </span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-700">
+          <thead class="bg-slate-50/80 text-slate-500 uppercase font-semibold text-[11px] border-b border-slate-200 tracking-wider">
+            <tr>
+              <th scope="col" class="py-3.5 px-4 text-center">ID</th>
+              <th scope="col" class="py-3.5 px-4">Nama Karyawan</th>
+              <th scope="col" class="py-3.5 px-3 text-center">Jam Masuk</th>
+              <th scope="col" class="py-3.5 px-3 text-center">Jam Keluar</th>
+              <th scope="col" class="py-3.5 px-3 text-center">Hadir</th>
+              <th scope="col" class="py-3.5 px-3 text-center">Alpa</th>
+              <th scope="col" class="py-3.5 px-3 text-center text-brand-700">Total Lembur (Jam)</th>
+              <th scope="col" class="py-3.5 px-4">Catatan Kegiatan Lembur</th>
+              <th scope="col" class="py-3.5 px-4 text-center">Koneksi Slip Gaji</th>
+            </tr>
+          </thead>
+          <tbody id="attendanceTableBody" class="divide-y divide-slate-100">
+            <!-- Data will be populated via JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <div id="employeeModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-100 overflow-hidden transform transition-all my-8">
+      <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h3 id="modalTitle" class="text-base font-bold text-slate-900">Tambah Karyawan Baru</h3>
+          <p class="text-xs text-slate-500">Masukkan detail data personal dan komponen upah karyawan</p>
+        </div>
+        <button onclick="closeEmployeeModal()" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="employeeForm" onsubmit="handleSaveEmployee(event)" class="p-6 space-y-4">
+        <input type="hidden" id="editEmployeeId">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">ID Karyawan</label>
+            <input type="text" id="formEmpId" required placeholder="Contoh: EMP-009" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Lengkap</label>
+            <input type="text" id="formEmpName" required placeholder="Nama lengkap karyawan" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Jabatan</label>
+            <input type="text" id="formRole" required placeholder="Mis: Backend Dev" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Departemen</label>
+            <select id="formDept" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
+              <option value="Engineering">Engineering</option>
+              <option value="Product & Design">Product & Design</option>
+              <option value="Finance & Tax">Finance & Tax</option>
+              <option value="HR & Operations">HR & Operations</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Status Kepegawaian</label>
+            <select id="formStatus" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
+              <option value="Tetap">Karyawan Tetap</option>
+              <option value="Kontrak">Karyawan Kontrak</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-100 pt-4">
+          <h4 class="text-xs font-bold text-slate-900 mb-3 flex items-center">
+            <i class="fa-solid fa-business-time text-brand-600 mr-1.5"></i> Presensi Jam Kerja & Akumulasi Lembur (5 Hari Kerja)
+          </h4>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-700 mb-1">Jam Masuk (Clock In)</label>
+              <input type="time" id="formCheckIn" value="08:00" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-700 mb-1">Jam Keluar (Clock Out)</label>
+              <input type="time" id="formCheckOut" value="17:00" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-700 mb-1">Total Jam Lembur (Jam)</label>
+              <input type="number" id="formOvertimeHours" min="0" max="150" step="0.5" placeholder="0" class="w-full text-xs px-2.5 py-1.5 border border-blue-300 rounded-lg focus:ring-2 focus:ring-brand-500 font-mono bg-blue-50/50 font-bold text-brand-700">
+            </div>
+            <div class="flex items-end">
+              <button type="button" onclick="autoCalculateModalOvertime()" class="w-full text-[11px] py-1.5 px-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-semibold transition">
+                <i class="fa-solid fa-calculator mr-1"></i> Hitung dari Jam
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Hadir (Hari)</label>
+              <input type="number" id="formAttPresent" min="0" max="22" value="22" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Cuti (Hari)</label>
+              <input type="number" id="formAttLeave" min="0" max="22" value="0" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Sakit (Hari)</label>
+              <input type="number" id="formAttSick" min="0" max="22" value="0" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Izin (Hari)</label>
+              <input type="number" id="formAttPermission" min="0" max="22" value="0" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-rose-600 mb-1">Alpa (Hari)</label>
+              <input type="number" id="formAttAlpha" min="0" max="22" value="0" class="w-full text-xs px-2.5 py-1.5 border border-rose-200 rounded-lg focus:ring-2 focus:ring-rose-500 font-mono">
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Catatan Pekerjaan / Surat Perintah Lembur (SPL)</label>
+            <textarea id="formOvertimeNotes" rows="2" placeholder="Tuliskan uraian pekerjaan lembur..." class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500"></textarea>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-100 pt-4">
+          <h4 class="text-xs font-bold text-slate-900 mb-3 flex items-center">
+            <i class="fa-solid fa-coins text-brand-600 mr-1.5"></i> Komponen Upah Pokok & Tunjangan
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Gaji Pokok (Rp)</label>
+              <input type="number" id="formBaseSalary" required min="0" step="50000" placeholder="0" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Tunjangan Jabatan (Rp)</label>
+              <input type="number" id="formAllowanceFixed" min="0" step="50000" placeholder="0" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Tunjangan Makan & Transport (Rp)</label>
+              <input type="number" id="formAllowanceVariable" min="0" step="50000" placeholder="0" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none font-mono">
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-100 pt-4">
+          <h4 class="text-xs font-bold text-slate-900 mb-3 flex items-center">
+            <i class="fa-solid fa-clipboard-user text-indigo-600 mr-1.5"></i> Data Absensi (Bulan Ini: 22 Hari Kerja)
+          </h4>
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Hadir (Hari)</label>
+              <input type="number" id="formAttPresent" min="0" max="22" value="22" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Cuti (Hari)</label>
+              <input type="number" id="formAttLeave" min="0" max="22" value="0" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Sakit (Hari)</label>
+              <input type="number" id="formAttSick" min="0" max="22" value="0" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Izin (Hari)</label>
+              <input type="number" id="formAttPermission" min="0" max="22" value="0" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-rose-600 mb-1">Alpa (Hari)</label>
+              <input type="number" id="formAttAlpha" min="0" max="22" value="0" class="w-full text-xs px-2.5 py-1.5 border border-rose-200 rounded-lg focus:ring-2 focus:ring-rose-500 font-mono">
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Catatan Lembur / Detail Kegiatan</label>
+            <textarea id="formOvertimeNotes" rows="2" placeholder="Contoh: Deployment sistem core perbankan di akhir pekan (8 jam), support rilis modul payroll (4.5 jam)" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500"></textarea>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-100 pt-4">
+          <h4 class="text-xs font-bold text-slate-900 mb-3 flex items-center">
+            <i class="fa-solid fa-building-columns text-emerald-600 mr-1.5"></i> Informasi Rekening Bank
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Bank</label>
+              <input type="text" id="formBankName" placeholder="Contoh: BCA, Mandiri, BRI" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Nomor Rekening</label>
+              <input type="text" id="formBankAccount" placeholder="1234-5678-90" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none font-mono">
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-4 flex items-center justify-end space-x-2 border-t border-slate-100">
+          <button type="button" onclick="closeEmployeeModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+            Batal
+          </button>
+          <button type="submit" class="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-md shadow-brand-500/25 transition">
+            Simpan Data
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="slipModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-100 overflow-hidden transform transition-all my-8">
+      <!-- Modal Top Controls (Hidden when print) -->
+      <div class="no-print px-6 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-file-invoice-dollar text-brand-400"></i>
+          <span class="text-xs font-semibold">Pratinjau Slip Gaji Resmi</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="window.print()" class="px-3 py-1.5 text-xs bg-brand-600 hover:bg-brand-500 rounded-lg font-medium flex items-center transition shadow">
+            <i class="fa-solid fa-print mr-1.5"></i> Cetak / Simpan PDF
+          </button>
+          <button onclick="closeSlipModal()" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Printable Slip Area -->
+      <div id="printableSlipArea" class="p-8 bg-white font-sans text-slate-800">
+        <!-- Slip Header -->
+        <div class="border-b-2 border-slate-800 pb-4 mb-5 flex justify-between items-start">
+          <div>
+            <h2 class="text-xl font-extrabold text-slate-900 tracking-tight">PT. TRIANA</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Kawasan Industri & Bisnis Terpadu, Gedung Triana Tower Lt. 8</p>
+            <p class="text-xs text-slate-500">Telp: (021) 789-2234 | Email: payroll@triana.co.id</p>
+          </div>
+          <div class="text-right">
+            <span class="inline-block bg-slate-100 text-slate-800 font-extrabold text-xs px-3 py-1 rounded border border-slate-300 uppercase tracking-wider">SLIP GAJI KARYAWAN</span>
+            <p class="text-xs text-slate-600 font-mono mt-1">No: <span id="slipNumber">SLIP/TRIANA/2026/10/001</span></p>
+            <p class="text-[11px] text-slate-500">Periode: <strong id="slipPeriod">Oktober 2026</strong></p>
+          </div>
+        </div>
+
+        <!-- Employee Info Grid -->
+        <div class="grid grid-cols-2 gap-x-6 gap-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs mb-4">
+          <div class="flex justify-between">
+            <span class="text-slate-500">ID Karyawan</span>
+            <strong id="slipEmpId" class="font-mono text-slate-800">EMP-001</strong>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Departemen</span>
+            <strong id="slipDept" class="text-slate-800">Engineering</strong>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Nama Lengkap</span>
+            <strong id="slipEmpName" class="text-slate-800">Budi Santoso</strong>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Status Karyawan</span>
+            <strong id="slipStatus" class="text-slate-800">Karyawan Tetap (PKWTT)</strong>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Jabatan</span>
+            <strong id="slipRole" class="text-slate-800">Lead Software Engineer</strong>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Rekening Transfer</span>
+            <strong id="slipBank" class="text-slate-800">BCA - 8830192811</strong>
+          </div>
+        </div>
+
+        <!-- Attendance & Work Hours Summary Widget on Slip -->
+        <div class="mb-4 bg-blue-50/50 border border-blue-200/60 p-3 rounded-xl text-xs space-y-1.5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-calendar-check text-brand-600"></i>
+              <span class="font-bold text-slate-800">Rekap Presensi (5 Hari Kerja):</span>
+              <span id="slipAttendanceSummary" class="text-slate-700">Hadir: 22/22 Hari | Cuti: 0 | Sakit: 0 | Alpa: 0</span>
+            </div>
+            <div class="text-[11px] text-slate-600 font-medium">
+              Kehadiran: <strong id="slipAttendanceRate" class="text-emerald-700">100%</strong>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center justify-between text-[11px] text-slate-600 border-t border-blue-200/50 pt-1.5">
+            <div>
+              <i class="fa-regular fa-clock mr-1 text-brand-500"></i>
+              Jam Kerja Harian: Masuk <strong id="slipCheckIn" class="font-mono text-slate-800">08:00</strong> WIB — Keluar <strong id="slipCheckOut" class="font-mono text-slate-800">19:30</strong> WIB
+            </div>
+            <div class="font-medium">
+              Standar Kantor PT. TRIANA: <span class="font-mono">08:00 - 17:00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overtime Note Box on Slip -->
+        <div id="slipOvertimeNoteContainer" class="mb-5 bg-amber-50/60 border border-amber-200/80 p-3 rounded-xl text-xs">
+          <span class="font-bold text-amber-900 flex items-center mb-1">
+            <i class="fa-solid fa-stopwatch mr-1.5"></i> Rincian & Catatan Jam Lembur (<span id="slipOvertimeBadgeHours">0</span> Jam):
+          </span>
+          <p id="slipOvertimeDetails" class="text-slate-700 italic text-[11px]">Tidak ada catatan lembur</p>
+        </div>
+
+        <!-- Earnings and Deductions Two-Column -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+          <!-- Earnings Table -->
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <div class="bg-blue-50/70 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
+              <span class="text-xs font-bold text-brand-800 uppercase tracking-wide">PENGHASILAN (EARNINGS)</span>
+              <i class="fa-solid fa-circle-plus text-xs text-brand-600"></i>
+            </div>
+            <div class="p-4 space-y-2.5 text-xs">
+              <div class="flex justify-between">
+                <span class="text-slate-600">Gaji Pokok</span>
+                <span id="slipBaseSalary" class="font-mono text-slate-800 font-medium">Rp 0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">Tunjangan Jabatan</span>
+                <span id="slipFixedAllowance" class="font-mono text-slate-800 font-medium">Rp 0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">Tunjangan Transport & Makan (<span id="slipDaysAttended">22</span> hari)</span>
+                <span id="slipVarAllowance" class="font-mono text-slate-800 font-medium">Rp 0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">Upah Lembur (<span id="slipOvertimeHours">0</span> jam)</span>
+                <span id="slipOvertimePay" class="font-mono text-slate-800 font-medium">Rp 0</span>
+              </div>
+              <div class="border-t border-slate-200 pt-2.5 flex justify-between font-bold text-slate-900 bg-slate-50 -mx-4 -mb-4 px-4 py-2.5">
+                <span>TOTAL BRUTO</span>
+                <span id="slipTotalGross" class="font-mono">Rp 0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deductions Table -->
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <div class="bg-red-50/70 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
+              <span class="text-xs font-bold text-red-800 uppercase tracking-wide">POTONGAN (DEDUCTIONS)</span>
+              <i class="fa-solid fa-circle-minus text-xs text-red-600"></i>
+            </div>
+            <div class="p-4 space-y-2.5 text-xs">
+              <div class="flex justify-between text-rose-600">
+                <span>Potongan Mangkir/Alpa (<span id="slipAlphaDays">0</span> hari)</span>
+                <span id="slipAlphaDeduction" class="font-mono font-medium">Rp 0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">BPJS Kesehatan (1%)</span>
+                <span id="slipBpjsKes" class="font-mono text-slate-800 font-medium">Rp 0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">BPJS Ketenagakerjaan JHT (2%)</span>
+                <span id="slipBpjsJht" class="font-mono text-slate-800 font-medium">Rp 0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">BPJS Ketenagakerjaan JP (1%)</span>
+                <span id="slipBpjsJp" class="font-mono text-slate-800 font-medium">Rp 0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">Estimasi PPh 21 (TER Bulanan)</span>
+                <span id="slipPph21" class="font-mono text-slate-800 font-medium">Rp 0</span>
+              </div>
+              <div class="border-t border-slate-200 pt-2.5 flex justify-between font-bold text-red-700 bg-red-50/50 -mx-4 -mb-4 px-4 py-2.5">
+                <span>TOTAL POTONGAN</span>
+                <span id="slipTotalDeductions" class="font-mono">Rp 0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Net Take Home Pay Highlight -->
+        <div class="bg-slate-900 text-white rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 mb-6">
+          <div>
+            <p class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">GAJI BERSIH DITERIMA (TAKE HOME PAY)</p>
+            <p id="slipTerbilang" class="text-xs text-slate-300 italic mt-0.5 max-w-md">"Terbilang: ..."</p>
+          </div>
+          <div class="text-right">
+            <span id="slipNetPay" class="text-2xl font-black text-emerald-400 font-mono tracking-tight">Rp 0</span>
+          </div>
+        </div>
+
+        <!-- Signature Section -->
+        <div class="grid grid-cols-2 gap-8 text-center text-xs text-slate-600 pt-3">
+          <div>
+            <p class="mb-14">Diterima oleh Karyawan,</p>
+            <p id="slipSignEmployee" class="font-bold text-slate-900 border-b border-slate-400 pb-1 inline-block min-w-[150px]">Nama Karyawan</p>
+          </div>
+          <div>
+            <p class="mb-14">Jakarta, 28 Oktober 2026<br>HRD & Finance PT. TRIANA,</p>
+            <p class="font-bold text-slate-900 border-b border-slate-400 pb-1 inline-block min-w-[150px]">Hendra Kurniawan, S.E.</p>
+          </div>
+        </div>
+
+        <div class="mt-8 text-center text-[10px] text-slate-400 border-t border-slate-100 pt-3 italic">
+          * Dokumen ini dibuat otomatis oleh sistem penggajian komputer PT. TRIANA dan diakui secara sah.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Standar hari kerja bulanan (5 hari kerja per minggu = 22 hari kerja per bulan)
+    const STANDARD_WORKING_DAYS = 22;
+    const STANDARD_START_HOUR = 8;  // 08:00
+    const STANDARD_END_HOUR = 17;   // 17:00
+
+    // Master data awal PT. TRIANA dengan data absensi lengkap, jam masuk, jam keluar, dan lembur
+    const DEFAULT_EMPLOYEES = [
+      {
+        id: "EMP-001",
+        name: "Budi Santoso",
+        role: "Lead Software Engineer",
+        department: "Engineering",
+        status: "Tetap",
+        baseSalary: 12000000,
+        allowanceFixed: 2500000,
+        allowanceVariable: 1200000,
+        checkIn: "08:00",
+        checkOut: "19:30",
+        overtimeHours: 12.5,
+        overtimeNotes: "Deploy arsitektur core PT. TRIANA (8 jam weekend) + penutupan bug fixing rilis sprint (4.5 jam)",
+        attendance: { present: 22, leave: 0, sick: 0, permission: 0, alpha: 0 },
+        bankName: "BCA",
+        bankAccount: "8830-192-811"
+      },
+      {
+        id: "EMP-002",
+        name: "Siti Rahmawati",
+        role: "Senior UI/UX Designer",
+        department: "Product & Design",
+        status: "Tetap",
+        baseSalary: 9500000,
+        allowanceFixed: 1500000,
+        allowanceVariable: 1000000,
+        checkIn: "08:15",
+        checkOut: "18:30",
+        overtimeHours: 6.0,
+        overtimeNotes: "Finalisasi revisi visual design system portal internal PT. TRIANA (6 jam)",
+        attendance: { present: 21, leave: 1, sick: 0, permission: 0, alpha: 0 },
+        bankName: "Mandiri",
+        bankAccount: "137-00-1928374-1"
+      },
+      {
+        id: "EMP-003",
+        name: "Andi Wijaya",
+        role: "Quality Assurance (QA)",
+        department: "Engineering",
+        status: "Kontrak",
+        baseSalary: 6500000,
+        allowanceFixed: 500000,
+        allowanceVariable: 800000,
+        checkIn: "08:00",
+        checkOut: "19:00",
+        overtimeHours: 14.0,
+        overtimeNotes: "Stress-testing performa server & verifikasi modul payroll (14 jam)",
+        attendance: { present: 20, leave: 0, sick: 1, permission: 0, alpha: 1 },
+        bankName: "BRI",
+        bankAccount: "0341-01-089721-50-3"
+      },
+      {
+        id: "EMP-004",
+        name: "Dewi Lestari",
+        role: "Content Writer & Media",
+        department: "Product & Design",
+        status: "Kontrak",
+        baseSalary: 5500000,
+        allowanceFixed: 300000,
+        allowanceVariable: 700000,
+        checkIn: "08:00",
+        checkOut: "18:00",
+        overtimeHours: 5.5,
+        overtimeNotes: "Dokumentasi publikasi artikel dan update media PT. TRIANA (5.5 jam)",
+        attendance: { present: 22, leave: 0, sick: 0, permission: 0, alpha: 0 },
+        bankName: "BCA",
+        bankAccount: "5220-449-102"
+      },
+      {
+        id: "EMP-005",
+        name: "Fajar Nugroho",
+        role: "DevOps & Cloud Engineer",
+        department: "Engineering",
+        status: "Tetap",
+        baseSalary: 11000000,
+        allowanceFixed: 2000000,
+        allowanceVariable: 1200000,
+        checkIn: "08:00",
+        checkOut: "20:00",
+        overtimeHours: 16.0,
+        overtimeNotes: "Maintenance jaringan cloud dan setup backup disaster recovery berkala (16 jam)",
+        attendance: { present: 21, leave: 0, sick: 1, permission: 0, alpha: 0 },
+        bankName: "BSI",
+        bankAccount: "7128-990-213"
+      },
+      {
+        id: "EMP-006",
+        name: "Rina Marlina",
+        role: "HR & Talent Specialist",
+        department: "HR & Operations",
+        status: "Tetap",
+        baseSalary: 7000000,
+        allowanceFixed: 800000,
+        allowanceVariable: 900000,
+        checkIn: "08:00",
+        checkOut: "17:00",
+        overtimeHours: 0,
+        overtimeNotes: "Tidak ada jam lembur bulan ini",
+        attendance: { present: 22, leave: 0, sick: 0, permission: 0, alpha: 0 },
+        bankName: "Mandiri",
+        bankAccount: "122-00-8819203-8"
+      },
+      {
+        id: "EMP-007",
+        name: "Hendra Kurniawan",
+        role: "Finance & Tax Lead",
+        department: "Finance & Tax",
+        status: "Tetap",
+        baseSalary: 8500000,
+        allowanceFixed: 1200000,
+        allowanceVariable: 1000000,
+        checkIn: "07:55",
+        checkOut: "18:00",
+        overtimeHours: 4.0,
+        overtimeNotes: "Rekonsiliasi tutup buku bulanan PT. TRIANA & pelaporan SPT PPh 21 (4 jam)",
+        attendance: { present: 22, leave: 0, sick: 0, permission: 0, alpha: 0 },
+        bankName: "BCA",
+        bankAccount: "6041-291-840"
+      }
+    ];
+
+    // In-memory working employee list
+    let employees = JSON.parse(JSON.stringify(DEFAULT_EMPLOYEES));
+
+    // Tab switcher function
+    function switchTab(tab) {
+      const payrollSection = document.getElementById('payrollViewSection');
+      const attendanceSection = document.getElementById('attendanceViewSection');
+      const tabBtnPayroll = document.getElementById('tabBtnPayroll');
+      const tabBtnAttendance = document.getElementById('tabBtnAttendance');
+
+      if (tab === 'payroll') {
+        payrollSection.classList.remove('hidden');
+        attendanceSection.classList.add('hidden');
+        tabBtnPayroll.className = "px-5 py-3 text-xs font-bold border-b-2 border-brand-600 text-brand-600 flex items-center space-x-2 transition";
+        tabBtnAttendance.className = "px-5 py-3 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 transition";
+      } else {
+        payrollSection.classList.add('hidden');
+        attendanceSection.classList.remove('hidden');
+        tabBtnAttendance.className = "px-5 py-3 text-xs font-bold border-b-2 border-brand-600 text-brand-600 flex items-center space-x-2 transition";
+        tabBtnPayroll.className = "px-5 py-3 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2 transition";
+      }
+    }
+
+    // Helper Format Rupiah
+    function formatRupiah(amount) {
+      return "Rp " + Math.round(amount).toLocaleString('id-ID');
+    }
+
+    // Hitung estimasi lembur dari selisih jam keluar terhadap batas jam kerja 17:00
+    function calculateOvertimeFromHours(checkIn, checkOut, daysAttended = 22) {
+      if (!checkOut) return 0;
+      const [outH, outM] = checkOut.split(':').map(Number);
+      const outDecimal = outH + (outM / 60);
+
+      // Jadwal pulang standar kantor PT. TRIANA adalah pukul 17:00
+      if (outDecimal > STANDARD_END_HOUR) {
+        const extraPerDay = outDecimal - STANDARD_END_HOUR;
+        // Hitung estimasi kumulatif berdasarkan hari masuk kerja (atau proporsi rata-rata)
+        const total = parseFloat((extraPerDay * Math.min(daysAttended, 10)).toFixed(1));
+        return total;
+      }
+      return 0;
+    }
+
+    function autoCalculateModalOvertime() {
+      const checkIn = document.getElementById('formCheckIn').value;
+      const checkOut = document.getElementById('formCheckOut').value;
+      const presentDays = parseInt(document.getElementById('formAttPresent').value) || 22;
+      const calculated = calculateOvertimeFromHours(checkIn, checkOut, presentDays);
+      document.getElementById('formOvertimeHours').value = calculated;
+    }
+
+    // Hitung Tunjangan Variabel (Makan/Transport) proporsional kehadiran fisik
+    function calculateActualVariableAllowance(emp) {
+      const fullAllowance = Number(emp.allowanceVariable) || 0;
+      const attended = emp.attendance ? Number(emp.attendance.present || 0) : STANDARD_WORKING_DAYS;
+      return Math.round((attended / STANDARD_WORKING_DAYS) * fullAllowance);
+    }
+
+    // Potongan Mangkir/Alpa = (Jumlah Hari Alpa / 22 Hari) * Gaji Pokok
+    function calculateAlphaDeduction(emp) {
+      const alphaDays = emp.attendance ? Number(emp.attendance.alpha || 0) : 0;
+      if (alphaDays <= 0) return 0;
+      const baseSalary = Number(emp.baseSalary) || 0;
+      const dailyWage = baseSalary / STANDARD_WORKING_DAYS;
+      return Math.round(dailyWage * alphaDays);
+    }
+
+    // Perhitungan upah lembur per jam sesuai PP No. 35 Tahun 2021: (1/173) * (Gaji Pokok + Tunjangan Tetap)
+    function calculateOvertimeHourlyRate(emp) {
+      const fixedMonthlyWage = (Number(emp.baseSalary) || 0) + (Number(emp.allowanceFixed) || 0);
+      return fixedMonthlyWage / 173;
+    }
+
+    // Total Upah Lembur
+    function calculateOvertimePay(emp) {
+      const hourlyRate = calculateOvertimeHourlyRate(emp);
+      const hours = Number(emp.overtimeHours) || 0;
+      return Math.round(hourlyRate * hours);
+    }
+
+    // Total Bruto (Gaji Pokok + Tunjangan Tetap + Tunjangan Makan/Transport Riil Hadir + Lembur)
+    function calculateGross(emp) {
+      const base = Number(emp.baseSalary) || 0;
+      const fixed = Number(emp.allowanceFixed) || 0;
+      const variable = calculateActualVariableAllowance(emp);
+      const overtime = calculateOvertimePay(emp);
+      return base + fixed + variable + overtime;
+    }
+
+    // Kalkulasi Potongan BPJS & Pajak + Potongan Alpa Kehadiran
+    function calculateDeductions(emp) {
+      const base = Number(emp.baseSalary) || 0;
+      const fixed = Number(emp.allowanceFixed) || 0;
+      const fixedWage = base + fixed;
+
+      // Batas maksimum upah BPJS Kesehatan (~Rp 12.000.000)
+      const wageBpjsKes = Math.min(fixedWage, 12000000);
+      const bpjsKes = Math.round(wageBpjsKes * 0.01);
+
+      // BPJS TK JHT (2%)
+      const bpjsJht = Math.round(fixedWage * 0.02);
+
+      // BPJS TK JP (1%, batas upah 2026 ~Rp 10.042.300)
+      const wageBpjsJp = Math.min(fixedWage, 10042300);
+      const bpjsJp = Math.round(wageBpjsJp * 0.01);
+
+      // Potongan Alpa
+      const alphaDeduction = calculateAlphaDeduction(emp);
+
+      // Estimasi PPh 21 TER bulanan
+      const gross = calculateGross(emp);
+      let pph21Rate = 0;
+      if (gross > 15000000) {
+        pph21Rate = 0.035;
+      } else if (gross > 10000000) {
+        pph21Rate = 0.025;
+      } else if (gross > 7000000) {
+        pph21Rate = 0.0125;
+      } else if (gross > 5400000) {
+        pph21Rate = 0.005;
+      } else {
+        pph21Rate = 0;
+      }
+      const pph21 = Math.round(gross * pph21Rate);
+
+      const totalDeductions = bpjsKes + bpjsJht + bpjsJp + pph21 + alphaDeduction;
+
+      return {
+        bpjsKes,
+        bpjsJht,
+        bpjsJp,
+        pph21,
+        alphaDeduction,
+        totalDeductions
+      };
+    }
+
+    // Hitung Take Home Pay (Gaji Bersih)
+    function calculateNetPay(emp) {
+      const gross = calculateGross(emp);
+      const { totalDeductions } = calculateDeductions(emp);
+      return Math.max(0, gross - totalDeductions);
+    }
+
+    function terbilang(nominal) {
+      nominal = Math.floor(Math.abs(nominal));
+      const huruf = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
+      let hasil = "";
+
+      if (nominal < 12) {
+        hasil = " " + huruf[nominal];
+      } else if (nominal < 20) {
+        hasil = terbilang(nominal - 10) + " Belas";
+      } else if (nominal < 100) {
+        hasil = terbilang(Math.floor(nominal / 10)) + " Puluh" + terbilang(nominal % 10);
+      } else if (nominal < 200) {
+        hasil = " Seratus" + terbilang(nominal - 100);
+      } else if (nominal < 1000) {
+        hasil = terbilang(Math.floor(nominal / 100)) + " Ratus" + terbilang(nominal % 100);
+      } else if (nominal < 2000) {
+        hasil = " Seribu" + terbilang(nominal - 1000);
+      } else if (nominal < 1000000) {
+        hasil = terbilang(Math.floor(nominal / 1000)) + " Ribu" + terbilang(nominal % 1000);
+      } else if (nominal < 1000000000) {
+        hasil = terbilang(Math.floor(nominal / 1000000)) + " Juta" + terbilang(nominal % 1000000);
+      } else if (nominal < 1000000000000) {
+        hasil = terbilang(Math.floor(nominal / 1000000000)) + " Milyar" + terbilang(nominal % 1000000000);
+      }
+      return hasil.trim();
+    }
+
+    // Render Tabel Penggajian dan Tabel Absensi Jam Masuk / Pulang
+    function renderTable() {
+      const tbodyPayroll = document.getElementById('payrollTableBody');
+      const tbodyAttendance = document.getElementById('attendanceTableBody');
+      const emptyState = document.getElementById('emptyState');
+      const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+      const deptVal = document.getElementById('filterDepartment').value;
+      const statusVal = document.getElementById('filterStatus').value;
+
+      // Filter data
+      const filtered = employees.filter(emp => {
+        const matchSearch = emp.name.toLowerCase().includes(searchVal) ||
+                            emp.id.toLowerCase().includes(searchVal) ||
+                            emp.role.toLowerCase().includes(searchVal);
+        const matchDept = (deptVal === 'ALL') || (emp.department === deptVal);
+        const matchStatus = (statusVal === 'ALL') || (emp.status === statusVal);
+        return matchSearch && matchDept && matchStatus;
+      });
+
+      tbodyPayroll.innerHTML = '';
+      tbodyAttendance.innerHTML = '';
+
+      if (filtered.length === 0) {
+        emptyState.classList.remove('hidden');
+      } else {
+        emptyState.classList.add('hidden');
+      }
+
+      document.getElementById('recordCountBadge').innerText = `${filtered.length} Karyawan PT. TRIANA`;
+
+      filtered.forEach((emp) => {
+        const actualVar = calculateActualVariableAllowance(emp);
+        const overtimePay = calculateOvertimePay(emp);
+        const gross = calculateGross(emp);
+        const deductions = calculateDeductions(emp);
+        const netPay = calculateNetPay(emp);
+        const att = emp.attendance || { present: 22, leave: 0, sick: 0, permission: 0, alpha: 0 };
+
+        // 1. Baris Tabel Payroll
+        const trPayroll = document.createElement('tr');
+        trPayroll.className = "hover:bg-slate-50/80 transition group";
+        trPayroll.innerHTML = `
+          <td class="py-3 px-4 text-center font-mono font-semibold text-slate-500">${emp.id}</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                ${emp.name.charAt(0)}
+              </div>
+              <div>
+                <p class="font-bold text-slate-900 leading-tight">${emp.name}</p>
+                <div class="flex items-center space-x-2 mt-0.5">
+                  <span class="text-[11px] text-slate-500">${emp.role}</span>
+                  <span class="inline-block w-1 h-1 rounded-full bg-slate-300"></span>
+                  <span class="text-[10px] px-1.5 py-0.2 rounded font-medium ${emp.status === 'Tetap' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">${emp.status}</span>
+                </div>
+              </div>
+            </div>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${att.present >= 22 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">
+              ${att.present} / ${STANDARD_WORKING_DAYS} Hari
+            </span>
+            ${att.alpha > 0 ? `<span class="block text-[10px] text-rose-600 font-bold mt-0.5">${att.alpha} Alpa</span>` : ''}
+          </td>
+          <td class="py-3 px-4 text-right font-mono text-slate-700">${formatRupiah(emp.baseSalary)}</td>
+          <td class="py-3 px-4 text-right font-mono text-slate-700" title="Jabatan: ${formatRupiah(emp.allowanceFixed)} | Makan Hadir: ${formatRupiah(actualVar)}">
+            ${formatRupiah((emp.allowanceFixed || 0) + actualVar)}
+          </td>
+          <td class="py-3 px-4 text-center">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${emp.overtimeHours > 0 ? 'bg-blue-50 text-brand-700' : 'text-slate-400'}">
+              ${emp.overtimeHours || 0} Jam
+            </span>
+          </td>
+          <td class="py-3 px-4 text-right font-mono text-slate-700">${formatRupiah(overtimePay)}</td>
+          <td class="py-3 px-4 text-right font-mono ${deductions.alphaDeduction > 0 ? 'text-rose-600 font-semibold' : 'text-slate-400'}">
+            ${deductions.alphaDeduction > 0 ? '-' + formatRupiah(deductions.alphaDeduction) : 'Rp 0'}
+          </td>
+          <td class="py-3 px-4 text-right font-mono text-red-600">(${formatRupiah(deductions.totalDeductions)})</td>
+          <td class="py-3 px-4 text-right font-mono font-bold text-emerald-600">${formatRupiah(netPay)}</td>
+          <td class="py-3 px-4 text-center">
+            <div class="flex items-center justify-center space-x-1.5">
+              <button onclick="viewSlip('${emp.id}')" title="Pratinjau Slip Gaji PT. TRIANA" class="px-2.5 py-1 text-xs text-brand-600 hover:text-white hover:bg-brand-600 rounded-lg transition border border-brand-200 hover:border-transparent font-medium flex items-center">
+                <i class="fa-solid fa-file-invoice text-xs mr-1"></i> Slip
+              </button>
+              <button onclick="editEmployee('${emp.id}')" title="Edit Data" class="p-1.5 text-slate-600 hover:text-white hover:bg-slate-700 rounded-lg transition border border-slate-200 hover:border-transparent">
+                <i class="fa-solid fa-pen-to-square text-xs"></i>
+              </button>
+              <button onclick="deleteEmployee('${emp.id}')" title="Hapus Karyawan" class="p-1.5 text-rose-600 hover:text-white hover:bg-rose-600 rounded-lg transition border border-rose-200 hover:border-transparent">
+                <i class="fa-solid fa-trash text-xs"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        tbodyPayroll.appendChild(trPayroll);
+
+        // 2. Baris Tabel Absensi (dengan Input Jam Masuk & Jam Keluar)
+        const trAttendance = document.createElement('tr');
+        trAttendance.className = "hover:bg-slate-50/80 transition";
+        trAttendance.innerHTML = `
+          <td class="py-3 px-4 text-center font-mono font-semibold text-slate-500">${emp.id}</td>
+          <td class="py-3 px-4">
+            <p class="font-bold text-slate-900 leading-tight">${emp.name}</p>
+            <p class="text-[11px] text-slate-500">${emp.department} • ${emp.role}</p>
+          </td>
+          <!-- Input Jam Masuk -->
+          <td class="py-3 px-2 text-center">
+            <input type="time" value="${emp.checkIn || '08:00'}" onchange="quickUpdateHours('${emp.id}', 'checkIn', this.value)" class="text-xs py-1 px-1.5 border border-slate-300 rounded-lg font-mono text-center bg-slate-50 hover:bg-white focus:bg-white">
+          </td>
+          <!-- Input Jam Keluar -->
+          <td class="py-3 px-2 text-center">
+            <input type="time" value="${emp.checkOut || '17:00'}" onchange="quickUpdateHours('${emp.id}', 'checkOut', this.value)" class="text-xs py-1 px-1.5 border border-slate-300 rounded-lg font-mono text-center bg-slate-50 hover:bg-white focus:bg-white">
+          </td>
+          <!-- Input Hadir -->
+          <td class="py-3 px-2 text-center">
+            <input type="number" min="0" max="22" value="${att.present}" onchange="quickUpdateAttendance('${emp.id}', 'present', this.value)" class="w-12 text-center text-xs py-1 px-1 border border-slate-200 rounded-lg font-bold text-emerald-700 bg-emerald-50/50">
+          </td>
+          <!-- Input Alpa -->
+          <td class="py-3 px-2 text-center">
+            <input type="number" min="0" max="22" value="${att.alpha}" onchange="quickUpdateAttendance('${emp.id}', 'alpha', this.value)" class="w-12 text-center text-xs py-1 px-1 border border-rose-300 rounded-lg font-bold text-rose-700 bg-rose-50/50">
+          </td>
+          <!-- Input Jam Lembur -->
+          <td class="py-3 px-2 text-center">
+            <input type="number" min="0" max="150" step="0.5" value="${emp.overtimeHours || 0}" onchange="quickUpdateOvertime('${emp.id}', this.value)" class="w-14 text-center text-xs py-1 px-1 border border-blue-300 rounded-lg font-bold text-brand-700 bg-blue-50/50" title="Bisa diketik langsung atau otomatis dari jam keluar">
+          </td>
+          <!-- Catatan Lembur -->
+          <td class="py-3 px-3 max-w-xs">
+            <input type="text" value="${emp.overtimeNotes || ''}" placeholder="Catatan tugas lembur..." onchange="quickUpdateOvertimeNotes('${emp.id}', this.value)" class="w-full text-[11px] py-1 px-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-brand-500 text-slate-700">
+          </td>
+          <!-- Tombol Link Langsung ke Slip Gaji -->
+          <td class="py-3 px-4 text-center">
+            <button onclick="viewSlip('${emp.id}')" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition">
+              <i class="fa-solid fa-receipt"></i>
+              <span>Slip Gaji (${formatRupiah(netPay)})</span>
+            </button>
+          </td>
+        `;
+        tbodyAttendance.appendChild(trAttendance);
+      });
+
+      updateStats();
+    }
+
+    // Pembaruan cepat jam masuk dan keluar dengan kalkulasi lembur otomatis
+    function quickUpdateHours(empId, field, timeValue) {
+      const emp = employees.find(e => e.id === empId);
+      if (!emp) return;
+      emp[field] = timeValue;
+
+      // Jika jam keluar diubah, otomatis hitung rekomendasi jam lembur jika melebihi jam 17:00
+      if (field === 'checkOut') {
+        const autoOT = calculateOvertimeFromHours(emp.checkIn || "08:00", timeValue, emp.attendance?.present || 22);
+        if (autoOT > 0 && (!emp.overtimeHours || emp.overtimeHours === 0)) {
+          emp.overtimeHours = autoOT;
+        }
+      }
+      renderTable();
+    }
+
+    // Pembaruan catatan lembur langsung dari tabel
+    function quickUpdateOvertimeNotes(empId, notes) {
+      const emp = employees.find(e => e.id === empId);
+      if (!emp) return;
+      emp.overtimeNotes = notes;
+    }
+
+    // Pembaruan cepat data kehadiran langsung dari tabel absensi
+    function quickUpdateAttendance(empId, field, value) {
+      const emp = employees.find(e => e.id === empId);
+      if (!emp) return;
+      if (!emp.attendance) {
+        emp.attendance = { present: 22, leave: 0, sick: 0, permission: 0, alpha: 0 };
+      }
+      emp.attendance[field] = Math.max(0, parseInt(value) || 0);
+      renderTable();
+    }
+
+    // Pembaruan cepat jam lembur langsung dari tabel absensi
+    function quickUpdateOvertime(empId, value) {
+      const emp = employees.find(e => e.id === empId);
+      if (!emp) return;
+      emp.overtimeHours = Math.max(0, parseFloat(value) || 0);
+      renderTable();
+    }
+
+    // Refresh metrik agregat
+    function updateStats() {
+      let totalGross = 0;
+      let totalNet = 0;
+      let totalDeductions = 0;
+      let countTetap = 0;
+      let countKontrak = 0;
+
+      employees.forEach(emp => {
+        totalGross += calculateGross(emp);
+        const ded = calculateDeductions(emp);
+        totalDeductions += ded.totalDeductions;
+        totalNet += calculateNetPay(emp);
+
+        if (emp.status === 'Tetap') countTetap++;
+        else countKontrak++;
+      });
+
+      document.getElementById('statTotalGross').innerText = formatRupiah(totalGross);
+      document.getElementById('statTotalNet').innerText = formatRupiah(totalNet);
+      document.getElementById('statTotalDeduction').innerText = formatRupiah(totalDeductions);
+      document.getElementById('statTotalEmployees').innerText = `${employees.length} Orang`;
+      document.getElementById('statActiveRatio').innerText = `${countTetap} Tetap | ${countKontrak} Kontrak`;
+    }
+
+    function handleSearchFilter() {
+      renderTable();
+    }
+
+    function openEmployeeModal(isEdit = false) {
+      const modal = document.getElementById('employeeModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      if (!isEdit) {
+        document.getElementById('modalTitle').innerText = "Tambah Karyawan PT. TRIANA";
+        document.getElementById('employeeForm').reset();
+        document.getElementById('editEmployeeId').value = "";
+        document.getElementById('formCheckIn').value = "08:00";
+        document.getElementById('formCheckOut').value = "17:00";
+        document.getElementById('formAttPresent').value = "22";
+        document.getElementById('formAttLeave').value = "0";
+        document.getElementById('formAttSick').value = "0";
+        document.getElementById('formAttPermission').value = "0";
+        document.getElementById('formAttAlpha').value = "0";
+        document.getElementById('formOvertimeHours').value = "0";
+        document.getElementById('formOvertimeNotes').value = "";
+        const nextNum = employees.length + 1;
+        document.getElementById('formEmpId').value = `EMP-${String(nextNum).padStart(3, '0')}`;
+      }
+    }
+
+    function closeEmployeeModal() {
+      const modal = document.getElementById('employeeModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function editEmployee(id) {
+      const emp = employees.find(e => e.id === id);
+      if (!emp) return;
+
+      document.getElementById('modalTitle').innerText = "Edit Data Gaji & Presensi PT. TRIANA";
+      document.getElementById('editEmployeeId').value = emp.id;
+      document.getElementById('formEmpId').value = emp.id;
+      document.getElementById('formEmpName').value = emp.name;
+      document.getElementById('formRole').value = emp.role;
+      document.getElementById('formDept').value = emp.department;
+      document.getElementById('formStatus').value = emp.status;
+      document.getElementById('formBaseSalary').value = emp.baseSalary;
+      document.getElementById('formAllowanceFixed').value = emp.allowanceFixed;
+      document.getElementById('formAllowanceVariable').value = emp.allowanceVariable;
+      document.getElementById('formCheckIn').value = emp.checkIn || "08:00";
+      document.getElementById('formCheckOut').value = emp.checkOut || "17:00";
+      document.getElementById('formOvertimeHours').value = emp.overtimeHours;
+      document.getElementById('formOvertimeNotes').value = emp.overtimeNotes || "";
+
+      const att = emp.attendance || { present: 22, leave: 0, sick: 0, permission: 0, alpha: 0 };
+      document.getElementById('formAttPresent').value = att.present;
+      document.getElementById('formAttLeave').value = att.leave;
+      document.getElementById('formAttSick').value = att.sick;
+      document.getElementById('formAttPermission').value = att.permission;
+      document.getElementById('formAttAlpha').value = att.alpha;
+
+      document.getElementById('formBankName').value = emp.bankName || "BCA";
+      document.getElementById('formBankAccount').value = emp.bankAccount || "-";
+
+      openEmployeeModal(true);
+    }
+
+    function handleSaveEmployee(e) {
+      e.preventDefault();
+      const editId = document.getElementById('editEmployeeId').value;
+      const empId = document.getElementById('formEmpId').value.trim();
+      const name = document.getElementById('formEmpName').value.trim();
+      const role = document.getElementById('formRole').value.trim();
+      const department = document.getElementById('formDept').value;
+      const status = document.getElementById('formStatus').value;
+      const baseSalary = parseFloat(document.getElementById('formBaseSalary').value) || 0;
+      const allowanceFixed = parseFloat(document.getElementById('formAllowanceFixed').value) || 0;
+      const allowanceVariable = parseFloat(document.getElementById('formAllowanceVariable').value) || 0;
+      const checkIn = document.getElementById('formCheckIn').value || "08:00";
+      const checkOut = document.getElementById('formCheckOut').value || "17:00";
+      const overtimeHours = parseFloat(document.getElementById('formOvertimeHours').value) || 0;
+      const overtimeNotes = document.getElementById('formOvertimeNotes').value.trim();
+      const bankName = document.getElementById('formBankName').value.trim() || "BCA";
+      const bankAccount = document.getElementById('formBankAccount').value.trim() || "-";
+
+      const attendance = {
+        present: parseInt(document.getElementById('formAttPresent').value) || 0,
+        leave: parseInt(document.getElementById('formAttLeave').value) || 0,
+        sick: parseInt(document.getElementById('formAttSick').value) || 0,
+        permission: parseInt(document.getElementById('formAttPermission').value) || 0,
+        alpha: parseInt(document.getElementById('formAttAlpha').value) || 0
+      };
+
+      const employeeData = {
+        id: empId,
+        name,
+        role,
+        department,
+        status,
+        baseSalary,
+        allowanceFixed,
+        allowanceVariable,
+        checkIn,
+        checkOut,
+        overtimeHours,
+        overtimeNotes,
+        attendance,
+        bankName,
+        bankAccount
+      };
+
+      if (editId) {
+        const index = employees.findIndex(item => item.id === editId);
+        if (index !== -1) {
+          employees[index] = employeeData;
+        }
+      } else {
+        employees.push(employeeData);
+      }
+
+      closeEmployeeModal();
+      renderTable();
+    }
+
+    function deleteEmployee(id) {
+      const target = employees.find(e => e.id === id);
+      if (!target) return;
+      showCustomConfirm(`Apakah Anda yakin ingin menghapus data karyawan ${target.name} (${target.id}) dari PT. TRIANA?`, () => {
+        employees = employees.filter(e => e.id !== id);
+        renderTable();
+      });
+    }
+
+    function showCustomConfirm(message, onConfirm) {
+      const confirmContainer = document.createElement('div');
+      confirmContainer.className = "fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4";
+      confirmContainer.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 text-center">
+          <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-3 text-lg">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <h3 class="font-bold text-slate-900 text-sm mb-1">Konfirmasi Penghapusan</h3>
+          <p class="text-xs text-slate-600 mb-5">${message}</p>
+          <div class="flex space-x-2 justify-center">
+            <button id="cancelConfirmBtn" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">Batal</button>
+            <button id="okConfirmBtn" class="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-500/25 transition">Hapus Data</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(confirmContainer);
+
+      confirmContainer.querySelector('#cancelConfirmBtn').onclick = () => {
+        confirmContainer.remove();
+      };
+      confirmContainer.querySelector('#okConfirmBtn').onclick = () => {
+        confirmContainer.remove();
+        onConfirm();
+      };
+    }
+
+    function resetDefaults() {
+      employees = JSON.parse(JSON.stringify(DEFAULT_EMPLOYEES));
+      document.getElementById('searchInput').value = "";
+      document.getElementById('filterDepartment').value = "ALL";
+      document.getElementById('filterStatus').value = "ALL";
+      renderTable();
+    }
+
+    // Modal Slip Gaji PT. TRIANA dengan Tautan Data Presensi & Lembur
+    function viewSlip(empId) {
+      const emp = employees.find(e => e.id === empId);
+      if (!emp) return;
+
+      const actualVarAllowance = calculateActualVariableAllowance(emp);
+      const overtimePay = calculateOvertimePay(emp);
+      const gross = calculateGross(emp);
+      const deductions = calculateDeductions(emp);
+      const netPay = calculateNetPay(emp);
+      const att = emp.attendance || { present: 22, leave: 0, sick: 0, permission: 0, alpha: 0 };
+
+      document.getElementById('slipNumber').innerText = `SLIP/TRIANA/2026/10/${emp.id.replace('EMP-', '')}`;
+      document.getElementById('slipPeriod').innerText = "Oktober 2026";
+      document.getElementById('slipEmpId').innerText = emp.id;
+      document.getElementById('slipDept').innerText = emp.department;
+      document.getElementById('slipEmpName').innerText = emp.name;
+      document.getElementById('slipStatus').innerText = emp.status === 'Tetap' ? 'Karyawan Tetap (PKWTT)' : 'Karyawan Kontrak (PKWT)';
+      document.getElementById('slipRole').innerText = emp.role;
+      document.getElementById('slipBank').innerText = `${emp.bankName || 'BCA'} - ${emp.bankAccount || '-'}`;
+
+      // Ringkasan Kehadiran & Jam Masuk / Keluar pada Slip
+      document.getElementById('slipAttendanceSummary').innerText = `Hadir: ${att.present}/${STANDARD_WORKING_DAYS} Hari | Cuti: ${att.leave} | Sakit: ${att.sick} | Izin: ${att.permission} | Alpa: ${att.alpha}`;
+      const attendancePercent = Math.round((att.present / STANDARD_WORKING_DAYS) * 100);
+      document.getElementById('slipAttendanceRate').innerText = `${attendancePercent}%`;
+      document.getElementById('slipCheckIn').innerText = emp.checkIn || "08:00";
+      document.getElementById('slipCheckOut').innerText = emp.checkOut || "17:00";
+
+      // Rincian Catatan Lembur
+      document.getElementById('slipOvertimeBadgeHours').innerText = emp.overtimeHours || 0;
+      document.getElementById('slipOvertimeDetails').innerText = emp.overtimeNotes && emp.overtimeNotes.trim() !== "" ? emp.overtimeNotes : (emp.overtimeHours > 0 ? `Lembur operasional ${emp.overtimeHours} jam (Jam pulang tercatat: ${emp.checkOut || '17:00'}).` : "Tidak ada catatan lembur.");
+
+      document.getElementById('slipBaseSalary').innerText = formatRupiah(emp.baseSalary);
+      document.getElementById('slipFixedAllowance').innerText = formatRupiah(emp.allowanceFixed);
+      document.getElementById('slipDaysAttended').innerText = att.present;
+      document.getElementById('slipVarAllowance').innerText = formatRupiah(actualVarAllowance);
+      document.getElementById('slipOvertimeHours').innerText = emp.overtimeHours || 0;
+      document.getElementById('slipOvertimePay').innerText = formatRupiah(overtimePay);
+      document.getElementById('slipTotalGross').innerText = formatRupiah(gross);
+
+      // Potongan
+      document.getElementById('slipAlphaDays').innerText = att.alpha;
+      document.getElementById('slipAlphaDeduction').innerText = formatRupiah(deductions.alphaDeduction);
+      document.getElementById('slipBpjsKes').innerText = formatRupiah(deductions.bpjsKes);
+      document.getElementById('slipBpjsJht').innerText = formatRupiah(deductions.bpjsJht);
+      document.getElementById('slipBpjsJp').innerText = formatRupiah(deductions.bpjsJp);
+      document.getElementById('slipPph21').innerText = formatRupiah(deductions.pph21);
+      document.getElementById('slipTotalDeductions').innerText = formatRupiah(deductions.totalDeductions);
+
+      document.getElementById('slipNetPay').innerText = formatRupiah(netPay);
+      document.getElementById('slipTerbilang').innerText = `"${terbilang(netPay)} Rupiah"`;
+      document.getElementById('slipSignEmployee').innerText = emp.name;
+
+      const modal = document.getElementById('slipModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeSlipModal() {
+      const modal = document.getElementById('slipModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function exportToCSV() {
+      const headers = [
+        "Perusahaan",
+        "ID Karyawan",
+        "Nama Karyawan",
+        "Jabatan",
+        "Departemen",
+        "Status",
+        "Jam Masuk",
+        "Jam Keluar",
+        "Hadir (5 Hari Kerja)",
+        "Cuti",
+        "Sakit",
+        "Izin",
+        "Alpa",
+        "Gaji Pokok",
+        "Tunjangan Tetap",
+        "Tunjangan Variabel Hadir",
+        "Jam Lembur",
+        "Catatan Lembur",
+        "Upah Lembur",
+        "Total Bruto",
+        "Potongan Alpa",
+        "BPJS Kesehatan",
+        "BPJS Ketenagakerjaan",
+        "PPh 21",
+        "Total Potongan",
+        "Take Home Pay",
+        "Bank",
+        "Nomor Rekening"
+      ];
+
+      const rows = employees.map(emp => {
+        const att = emp.attendance || { present: 22, leave: 0, sick: 0, permission: 0, alpha: 0 };
+        const actualVar = calculateActualVariableAllowance(emp);
+        const overtime = calculateOvertimePay(emp);
+        const gross = calculateGross(emp);
+        const ded = calculateDeductions(emp);
+        const net = calculateNetPay(emp);
+        return [
+          `"PT. TRIANA"`,
+          `"${emp.id}"`,
+          `"${emp.name}"`,
+          `"${emp.role}"`,
+          `"${emp.department}"`,
+          `"${emp.status}"`,
+          `"${emp.checkIn || '08:00'}"`,
+          `"${emp.checkOut || '17:00'}"`,
+          att.present,
+          att.leave,
+          att.sick,
+          att.permission,
+          att.alpha,
+          emp.baseSalary,
+          emp.allowanceFixed,
+          actualVar,
+          emp.overtimeHours,
+          `"${(emp.overtimeNotes || '').replace(/"/g, '""')}"`,
+          overtime,
+          gross,
+          ded.alphaDeduction,
+          ded.bpjsKes,
+          (ded.bpjsJht + ded.bpjsJp),
+          ded.pph21,
+          ded.totalDeductions,
+          net,
+          `"${emp.bankName || 'BCA'}"`,
+          `"${emp.bankAccount || '-'}"`
+        ];
+      });
+
+      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Rekap_PT_TRIANA_Payroll_Absensi_Oktober_2026_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Inisialisasi awal saat halaman termuat
+    window.onload = function() {
+      renderTable();
+    };
+  </script>
+</body>
+</html>
